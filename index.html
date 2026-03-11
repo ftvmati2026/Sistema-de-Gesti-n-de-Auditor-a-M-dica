@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Gestión Gravity</title>
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Iconos -->
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+
+  <!-- Bibliotecas JS (PapaParse para Google Sheets y Chart.js para gráficos) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+
+  <!-- Navegación -->
+  <nav style="flex-direction: column; padding: 20px 2rem; gap: 20px;">
+    <!-- LOGO Y TITULAR -->
+    <div
+      style="display: flex; align-items: center; justify-content: center; width: 100%; border-bottom: 1px solid var(--border-color); padding-bottom: 20px; gap: 25px;">
+      <img src="avera.jpg" alt="Avera" style="height: 60px; object-fit: contain; border-radius: 8px;">
+
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
+        <h1 style="font-size: 1.8rem; font-weight: 800; color: #38bdf8; margin: 0; text-transform: uppercase;">
+          SISTEMA DE GESTIÓN DE AUDITORÍA MÉDICA
+        </h1>
+        <div style="font-size: 1rem; color: #a78bfa; font-weight: 700; letter-spacing: 5px; margin-top: 5px;">
+          GRAVITY CRM
+        </div>
+      </div>
+
+      <img src="emerald.jpg" alt="Emerald" style="height: 60px; object-fit: contain; border-radius: 8px;">
+    </div>
+
+    <!-- CONTROLES -->
+    <div class="nav-controls"
+      style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap; justify-content: space-between; width: 100%;">
+
+      <!-- WIDGET FECHA Y HORA -->
+      <div class="datetime-widget-container">
+        <!-- Calendario Madera -->
+        <div class="wooden-calendar">
+          <div class="cal-block-long" id="cal-day">...</div>
+          <div class="cal-mid-blocks">
+            <div class="cal-block-square" id="cal-date-d1">0</div>
+            <div class="cal-block-square" id="cal-date-d2">0</div>
+          </div>
+          <div class="cal-block-long" id="cal-month">...</div>
+        </div>
+
+        <!-- Reloj Split-flap -->
+        <div class="split-flap-clock">
+          <div class="flap"><span id="flap-h1">0</span></div>
+          <div class="flap"><span id="flap-h2">0</span></div>
+          <div class="flap-sep">:</div>
+          <div class="flap"><span id="flap-m1">0</span></div>
+          <div class="flap"><span id="flap-m2">0</span></div>
+          <div class="flap-sep">:</div>
+          <div class="flap"><span id="flap-s1">0</span></div>
+          <div class="flap"><span id="flap-s2">0</span></div>
+        </div>
+      </div>
+
+      <!-- Campañas -->
+      <div class="tabs" id="campaign-tabs">
+        <button class="camp-btn active" data-sheetid="16wx9YDPOdGelHMtbwyOFatilAOHWrpgzVjr8Xn6fU9o">San Juan</button>
+        <button class="camp-btn" data-sheetid="17FhJMhhK-lkW3_K6oDuUr_K3LDJz71oYg6R99_uGKF4">Salta</button>
+        <button class="camp-btn" data-sheetid="1xGDGOSsexE7AWUicl4YBhF_SwtB-Y_bjAMR7o8ZqHcw">Protección Emerald</button>
+      </div>
+      <!-- Meses -->
+      <div class="tabs" id="month-tabs"
+        style="overflow-x: auto; max-width: 100%; white-space: nowrap; padding-bottom: 5px;">
+        <!-- Se generarán dinámicamente desde JS (Todos los meses del año) -->
+      </div>
+      <!-- Container de Acciones -->
+      <div style="display: flex; gap: 10px;">
+        <button id="theme-toggle" class="action-btn" title="Cambiar tema visual"
+          style="display: flex; align-items: center; justify-content: center; background: transparent; border: 1px solid var(--border-color); color: var(--text-main); padding: 8px;">
+          <span class="material-symbols-outlined" id="theme-icon">light_mode</span>
+        </button>
+        <!-- Botón Teresa -->
+        <button id="btn-teresa" class="action-btn" title="Ver de Todas las Campañas"
+          style="display: flex; align-items: center; gap: 5px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.5);">
+          <span class="material-symbols-outlined" style="font-size: 20px;">medical_services</span>
+          Libretas de Salud Pendientes
+        </button>
+        <!-- Actualizar -->
+        <button id="btn-actualizar" class="action-btn" style="display: flex; align-items: center; gap: 5px;">
+          <span class="material-symbols-outlined" style="font-size: 20px;">refresh</span>
+          Actualizar
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Contenido Principal -->
+  <div class="container">
+
+    <!-- Título -->
+    <div class="dashboard-header">
+      <div class="dashboard-title">
+        <h2 id="mes-titulo">Gestión de Marzo</h2>
+        <p>Resumen general de clientes y estados hasta la fecha</p>
+      </div>
+    </div>
+
+    <!-- Tarjetas de Métricas -->
+    <div class="metrics-grid">
+      <div class="metric-card aceptadas">
+        <span class="metric-title">Aceptadas</span>
+        <span class="metric-value" id="tot-aceptadas">0</span>
+      </div>
+      <div class="metric-card rechazadas">
+        <span class="metric-title">Rechazadas</span>
+        <span class="metric-value" id="tot-rechazadas">0</span>
+      </div>
+      <div class="metric-card cuotas">
+        <span class="metric-title">Cuotas</span>
+        <span class="metric-value" id="tot-cuotas">0</span>
+      </div>
+      <div class="metric-card devueltas">
+        <span class="metric-title">Devueltas</span>
+        <span class="metric-value" id="tot-devueltas">0</span>
+      </div>
+      <div class="metric-card pendientes">
+        <span class="metric-title">Pendientes</span>
+        <span class="metric-value" id="tot-pendientes">0</span>
+      </div>
+    </div>
+
+    <!-- Gráfico de Tendencias -->
+    <div class="chart-container">
+      <h3>Tendencia de Estados en el Tiempo</h3>
+      <div class="canvas-wrapper">
+        <canvas id="tendenciaChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Buscador (entre gráfico y tabla) -->
+    <div style="margin-bottom: 16px;">
+      <div class="search-box">
+        <span class="material-symbols-outlined search-icon">search</span>
+        <input type="text" id="buscador" placeholder="Buscar por cliente, asesor, teléfono...">
+      </div>
+    </div>
+
+    <!-- Tabla de Datos -->
+    <div class="table-container">
+      <div class="table-header-row" style="flex-wrap: wrap; gap: 15px;">
+        <div style="display: flex; align-items: center; gap: 15px;">
+          <h3>Registro de Clientes</h3>
+          <span class="badge" style="background: rgba(255,255,255,0.1); color: var(--text-main);" id="tot-registros">0
+            Registros</span>
+        </div>
+        <!-- Botones de Filtro por Estado -->
+        <div class="status-filters" id="status-filters" style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button class="filter-btn active" data-filter="TODOS">TODOS</button>
+          <button class="filter-btn" data-filter="ACEPTADA">ACEPTADAS</button>
+          <button class="filter-btn" data-filter="RECHAZADA">RECHAZADAS</button>
+          <button class="filter-btn" data-filter="CUOTA">CUOTA</button>
+          <button class="filter-btn" data-filter="DEVUELTA">DEVUELTA</button>
+          <button class="filter-btn" data-filter="PENDIENTE">PENDIENTE</button>
+        </div>
+      </div>
+      <div style="overflow-x: auto; max-height: 500px; display: block;">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Asesor</th>
+              <th>Cliente</th>
+              <th>Teléfono</th>
+              <th>Estado</th>
+              <th>Auditor</th>
+              <th>Observación / Estado Aud.</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-body">
+            <!-- Filas generadas por JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Footer / Créditos -->
+  <footer
+    style="margin-top: 40px; padding: 20px; border-top: 1px solid var(--border-color); text-align: center; color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">
+    <div style="display: flex; flex-direction: column; gap: 8px; align-items: center; justify-content: center;">
+      <p style="margin: 0;">Diseñado y Desarrollado en su totalidad por <strong
+          style="color: #38bdf8; font-weight: 600;">Matías Gómez</strong></p>
+
+      <div style="display: flex; gap: 15px; align-items: center; justify-content: center; margin: 5px 0;">
+        <!-- WhatsApp -->
+        <div style="display: flex; align-items: center; gap: 5px;">
+          <svg style="width: 18px; height: 18px; fill: #10b981;" xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 448 512">
+            <path
+              d="M380.9 97.1C339 55.1 283.2 32 223.9 32c-122.4 0-222 99.6-222 222 0 39.1 10.2 77.3 29.6 111L0 480l117.7-30.9c32.4 17.7 68.9 27 106.1 27h.1c122.3 0 224.1-99.6 224.1-222 0-59.3-25.2-115-67.1-157zm-157 341.6c-33.2 0-65.7-8.9-94-25.7l-6.7-4-69.8 18.3L72 359.2l-4.4-7c-18.5-29.4-28.2-63.3-28.2-98.2 0-101.7 82.8-184.5 184.6-184.5 49.3 0 95.6 19.2 130.4 54.1 34.8 34.9 56.2 81.2 56.1 130.5 0 101.8-84.9 184.6-186.6 184.6zm101.2-138.2c-5.5-2.8-32.8-16.2-37.9-18-5.1-1.9-8.8-2.8-12.5 2.8-3.7 5.6-14.3 18-17.6 21.8-3.2 3.7-6.5 4.2-12 1.4-32.6-16.3-54-29.1-75.5-66-5.7-9.8 5.7-9.1 16.3-30.3 1.8-3.7 .9-6.9-.5-9.7-1.4-2.8-12.5-30.1-17.1-41.2-4.5-10.8-9.1-9.3-12.5-9.5-3.2-.2-6.9-.2-10.6-.2-3.7 0-9.7 1.4-14.8 6.9-5.1 5.6-19.4 19-19.4 46.3 0 27.3 19.9 53.7 22.6 57.4 2.8 3.7 39.1 59.7 94.8 83.8 35.2 15.2 49 16.5 66.6 13.9 10.7-1.6 32.8-13.4 37.4-26.4 4.6-13 4.6-24.1 3.2-26.4-1.3-2.5-5-3.9-10.5-6.6z" />
+          </svg>
+          <span>+54 9 2612404479</span>
+        </div>
+        <!-- Email -->
+        <div style="display: flex; align-items: center; gap: 5px;">
+          <span class="material-symbols-outlined" style="font-size: 18px; color: #f43f5e;">mail</span>
+          <a href="mailto:ftvmati2022@gmail.com"
+            style="color: inherit; text-decoration: none;">ftvmati2022@gmail.com</a>
+        </div>
+      </div>
+
+      <p style="margin: 0; font-size: 0.8rem; opacity: 0.7;">&copy; 2026 GRAVITY CRM. Todos los derechos reservados.</p>
+    </div>
+  </footer>
+
+  <!-- Modal Teresa -->
+  <div id="teresa-modal"
+    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 200; justify-content: center; align-items: center;">
+    <div
+      style="background: var(--panel-bg); color: var(--text-main); width: 90%; max-width: 1000px; border-radius: 12px; border: 1px solid var(--border-color); display: flex; flex-direction: column; max-height: 85vh; padding: 2rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span class="material-symbols-outlined" style="color: #a78bfa; font-size: 32px;">medical_information</span>
+          <h2 style="font-size: 1.5rem; font-weight: 600;">Libretas de Salud Pendientes</h2>
+        </div>
+        <button id="close-teresa"
+          style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; display: flex;"><span
+            class="material-symbols-outlined">close</span></button>
+      </div>
+
+      <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">
+        Listado global de libretas detectadas con la palabra "TERESA". Este reporte engloba <strong>las 3 SEDES
+          juntas</strong> simultáneamente en tiempo real.
+      </p>
+
+      <div style="overflow-y: auto; flex: 1; padding-bottom: 10px;">
+        <table style="width: 100%;">
+          <thead>
+            <tr>
+              <th>Días de Demora</th>
+              <th>Sede</th>
+              <th>Mes</th>
+              <th>Cliente</th>
+              <th>Teléfono</th>
+              <th>Asesor</th>
+              <th>Anotación Teresa</th>
+            </tr>
+          </thead>
+          <tbody id="teresa-body">
+            <!-- Filas js -->
+          </tbody>
+        </table>
+      </div>
+      <!-- Resumen Totalizador -->
+      <div
+        style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; align-items: center;">
+        <span style="font-weight: 600; font-size: 1.1rem; color: var(--text-main);">
+          Total Libretas Pendientes: <span id="teresa-total"
+            style="color: #a78bfa; font-size: 1.4rem; padding-left: 10px;">0</span>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loader Overlay -->
+  <div id="loader" style="display: flex;">
+    <div class="spinner"></div>
+    <h3 style="margin-top: 15px;">Sincronizando con Google Sheets...</h3>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>
