@@ -21,6 +21,7 @@ let allData = [];
 let chartInstance = null;
 let currentStatusFilter = 'TODOS';
 let currentSearchQuery = '';
+let totalDesreguladas = 0; // Total de desreguladas del mes seleccionado (suma columna K)
 
 // Nuevas variables globales para búsqueda global
 let globalData = [];
@@ -109,6 +110,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
         modalTeresa.addEventListener('click', (e) => {
             if (e.target === modalTeresa) modalTeresa.style.display = 'none';
+        });
+    }
+
+    // Modal Asesores Toggle
+    const btnAsesores = document.getElementById('btn-asesores');
+    const modalAsesores = document.getElementById('asesores-modal');
+    const btnCerrarAsesores = document.getElementById('close-asesores');
+
+    if (btnAsesores && modalAsesores) {
+        btnAsesores.addEventListener('click', () => {
+            abrirModalAsesores();
+        });
+
+        btnCerrarAsesores.addEventListener('click', () => {
+            modalAsesores.style.display = 'none';
+        });
+
+        modalAsesores.addEventListener('click', (e) => {
+            if (e.target === modalAsesores) modalAsesores.style.display = 'none';
         });
     }
 
@@ -276,6 +296,7 @@ function renderMonthTabs(activeMonths) {
 function processSelectedMonth() {
     document.getElementById('mes-titulo').innerText = `Gestión de ${currentMonth}`;
     allData = [];
+    totalDesreguladas = 0; // Resetear
 
     let json = sheetResponses[currentMonth];
 
@@ -287,12 +308,28 @@ function processSelectedMonth() {
         return;
     }
 
+    // Columna K es el índice 10 (A=0, B=1, ... K=10)
+    // Pero la API de Google Sheets puede devolver menos columnas si las últimas están vacías.
+    // Buscamos por encabezado 'DESREGUL' primero; si no lo encontramos, usamos el índice 10.
+    let desreguladaColIndex = 10; // Columna K por defecto (0-indexed)
+    if (json.table.cols) {
+        for (let c = 0; c < json.table.cols.length; c++) {
+            const label = json.table.cols[c] && json.table.cols[c].label
+                ? String(json.table.cols[c].label).toUpperCase().trim()
+                : '';
+            if (label.includes('DESREGUL')) {
+                desreguladaColIndex = c;
+                break;
+            }
+        }
+    }
+
     let currentDate = "Sin fecha";
     const rows = json.table.rows;
 
     for (let i = 0; i < rows.length; i++) {
         const rowData = rows[i].c;
-        if (!rowData || rowData.length < 4) continue;
+        if (!rowData) continue;
 
         const getVal = (colIndex) => {
             if (rowData[colIndex] && rowData[colIndex].v !== null && rowData[colIndex].v !== undefined) {
@@ -300,6 +337,21 @@ function processSelectedMonth() {
             }
             return '';
         };
+
+        const getNumVal = (colIndex) => {
+            if (rowData[colIndex] && rowData[colIndex].v !== null && rowData[colIndex].v !== undefined) {
+                const n = parseFloat(rowData[colIndex].v);
+                return isNaN(n) ? 0 : n;
+            }
+            return 0;
+        };
+
+        // Sumar columna K en TODAS las filas (independientemente de si es fila de cliente o fecha)
+        if (rowData.length > desreguladaColIndex) {
+            totalDesreguladas += getNumVal(desreguladaColIndex);
+        }
+
+        if (rowData.length < 4) continue;
 
         const col1 = getVal(1); // ASESOR
         const col3 = getVal(3); // CLIENTE/FECHA
@@ -367,7 +419,12 @@ function aplicarFiltrosCombinados() {
     }
 
     if (currentStatusFilter !== 'TODOS') {
-        filtered = filtered.filter(d => d.categoria.includes(currentStatusFilter));
+        // DESREGULADAS es una métrica de planilla, no un filtro individual por cliente.
+        // Al seleccionar ese filtro, mostramos todos los registros (sin filtrar la tabla)
+        // ya que el dato viene de la columna K acumulada, no de campos por fila.
+        if (currentStatusFilter !== 'DESREGULADA') {
+            filtered = filtered.filter(d => d.categoria.includes(currentStatusFilter));
+        }
     }
 
     if (currentSearchQuery) {
@@ -459,6 +516,7 @@ function renderTable(dataArray, isGlobalSearch = false) {
             </td>`;
         }
 
+        // Armar el label de estado
         tr.innerHTML = extraTd + `
             <td style="white-space: nowrap; font-size: 0.8rem; font-weight: 500;">${d.fecha}</td>
             <td style="font-weight: 600; color: #38bdf8;">${d.asesor}</td>
@@ -489,6 +547,8 @@ function renderMetrics(dataArray) {
         else if (d.categoria.includes('PENDIENTE')) stats.pendientes++;
     });
 
+    // Desreguladas: viene de la suma de la columna K, calculada en processSelectedMonth
+    document.getElementById('tot-desreguladas').innerText = Math.round(totalDesreguladas);
     document.getElementById('tot-aceptadas').innerText = stats.aceptadas;
     document.getElementById('tot-rechazadas').innerText = stats.rechazadas;
     document.getElementById('tot-cuotas').innerText = stats.cuotas;
@@ -895,6 +955,19 @@ function parseGlobalData(sede, mesStr, json) {
         if (col1 === '' && col3 !== '' && col4 === '') {
             currentDate = col3;
         } else if (col1 !== '' && col3 !== '') {
+            // Detectar columna DESREGULADAS para búsqueda global
+            let desreguladaVal = '';
+            if (json.table.cols) {
+                for (let c = 0; c < json.table.cols.length; c++) {
+                    const label = json.table.cols[c] && json.table.cols[c].label
+                        ? String(json.table.cols[c].label).toUpperCase().trim()
+                        : '';
+                    if (label.includes('DESREGUL')) {
+                        desreguladaVal = getVal(c);
+                        break;
+                    }
+                }
+            }
             globalData.push({
                 sedeNombre: sede.nombre,
                 sedeId: sede.id,
@@ -906,8 +979,233 @@ function parseGlobalData(sede, mesStr, json) {
                 telefono: getVal(5),
                 observacion: getVal(6),
                 estado_auditor: getVal(7),
-                auditor: getVal(8).toUpperCase()
+                auditor: getVal(8).toUpperCase(),
+                desregulada: desreguladaVal
             });
         }
     }
+}
+
+// ============================================================
+// MODAL: ESTADÍSTICAS POR ASESOR
+// ============================================================
+
+let asesorSortCol = 'total';
+let asesorSortDir = -1; // -1 = desc, 1 = asc
+let asesorDataCache = [];
+
+function abrirModalAsesores() {
+    const modal = document.getElementById('asesores-modal');
+    const buscador = document.getElementById('buscador-asesor');
+    modal.style.display = 'flex';
+
+    // Resetear buscador y sort
+    buscador.value = '';
+    asesorSortCol = 'total';
+    asesorSortDir = -1;
+
+    // Detectar sede activa segun currentSheetId para pre-seleccionarla
+    const sedeActual = sedesGlobales.find(s => s.id === currentSheetId);
+    const nombreSedeDefault = sedeActual ? sedeActual.nombre : 'San Juan';
+
+    // Configurar listeners de botones de sede
+    document.querySelectorAll('.asesor-sede-btn').forEach(btn => {
+        btn.onclick = () => {
+            cambiarSedeAsesores(btn.getAttribute('data-sede'));
+        };
+    });
+
+    // Listeners de ordenamiento en encabezados
+    document.querySelectorAll('#asesores-table th.sortable').forEach(th => {
+        th.onclick = () => {
+            const col = th.getAttribute('data-col');
+            if (asesorSortCol === col) {
+                asesorSortDir *= -1;
+            } else {
+                asesorSortCol = col;
+                asesorSortDir = -1;
+            }
+            renderTablaAsesores(asesorDataCache, buscador.value.trim().toLowerCase());
+        };
+    });
+
+    // Listener del buscador
+    buscador.oninput = () => {
+        renderTablaAsesores(asesorDataCache, buscador.value.trim().toLowerCase());
+    };
+
+    // Cargar con la sede activa por defecto
+    cambiarSedeAsesores(nombreSedeDefault);
+}
+
+function cambiarSedeAsesores(nombreSede) {
+    const buscador = document.getElementById('buscador-asesor');
+    const subtitulo = document.getElementById('asesores-subtitulo');
+    const loadingHint = document.getElementById('asesores-loading-hint');
+
+    // Colores por sede
+    const coloresSede = {
+        'San Juan':           { bg: 'rgba(139,92,246,0.2)',  color: '#a78bfa', border: 'rgba(139,92,246,0.6)' },
+        'Salta':              { bg: 'rgba(56,189,248,0.2)',  color: '#38bdf8', border: 'rgba(56,189,248,0.6)' },
+        'Protecci\u00f3n Emerald': { bg: 'rgba(16,185,129,0.2)', color: '#10b981', border: 'rgba(16,185,129,0.6)' }
+    };
+
+    // Actualizar estilo visual de los botones
+    document.querySelectorAll('.asesor-sede-btn').forEach(btn => {
+        const esActivo = btn.getAttribute('data-sede') === nombreSede;
+        if (esActivo) {
+            const c = coloresSede[nombreSede] || { bg: 'rgba(56,189,248,0.2)', color: '#38bdf8', border: 'rgba(56,189,248,0.6)' };
+            btn.style.background = c.bg;
+            btn.style.color = c.color;
+            btn.style.border = '1px solid ' + c.border;
+            btn.style.fontWeight = '800';
+        } else {
+            btn.style.background = 'transparent';
+            btn.style.color = 'var(--text-muted)';
+            btn.style.border = '1px solid var(--border-color)';
+            btn.style.fontWeight = '700';
+        }
+    });
+
+    // Si globalData aun carga, mostrar aviso
+    if (isLoadingGlobalData) {
+        loadingHint.style.display = 'flex';
+    } else {
+        loadingHint.style.display = 'none';
+    }
+
+    // Filtrar globalData por sede seleccionada
+    const datosSede = globalData.filter(d => d.sedeNombre === nombreSede);
+
+    // Agrupar por asesor
+    const mapaAsesores = {};
+    datosSede.forEach(d => {
+        const nombre = d.asesor.trim();
+        if (!nombre) return;
+        if (!mapaAsesores[nombre]) {
+            mapaAsesores[nombre] = { nombre, aceptadas: 0, rechazadas: 0, cuotas: 0, devueltas: 0, pendientes: 0, total: 0 };
+        }
+        const s = mapaAsesores[nombre];
+        if (d.categoria.includes('ACEPTADA'))       { s.aceptadas++; s.total++; }
+        else if (d.categoria.includes('RECHAZADA')) { s.rechazadas++; s.total++; }
+        else if (d.categoria.includes('CUOTA'))     { s.cuotas++; s.total++; }
+        else if (d.categoria.includes('DEVUELTA'))  { s.devueltas++; s.total++; }
+        else if (d.categoria.includes('PENDIENTE')) { s.pendientes++; s.total++; }
+        else { s.total++; }
+    });
+
+    asesorDataCache = Object.values(mapaAsesores);
+
+    // Subtitulo con info de la sede
+    const mesesDisp = [...new Set(datosSede.map(d => d.mes))];
+    const mesesStr = mesesDisp.length > 0
+        ? mesesDisp.map(m => m.charAt(0) + m.slice(1).toLowerCase()).join(', ')
+        : '—';
+    subtitulo.innerText = datosSede.length > 0
+        ? nombreSede + ' \u00b7 ' + datosSede.length + ' registros \u00b7 Meses con datos: ' + mesesStr
+        : nombreSede + ' \u00b7 Sin datos disponibles a\u00fan (cargando...)';
+
+    // Reset buscador y renderizar
+    buscador.value = '';
+    renderTablaAsesores(asesorDataCache, '');
+}
+
+function renderTablaAsesores(data, filtro) {
+    const tbody = document.getElementById('asesores-body');
+    const footer = document.getElementById('asesores-footer');
+
+    // Filtrar por búsqueda
+    let lista = filtro
+        ? data.filter(a => a.nombre.toLowerCase().includes(filtro))
+        : [...data];
+
+    // Ordenar
+    lista.sort((a, b) => {
+        const va = asesorSortCol === 'nombre' ? a.nombre : (a[asesorSortCol] ?? 0);
+        const vb = asesorSortCol === 'nombre' ? b.nombre : (b[asesorSortCol] ?? 0);
+        if (va < vb) return -1 * asesorSortDir;
+        if (va > vb) return  1 * asesorSortDir;
+        return 0;
+    });
+
+    // Actualizar íconos de sort en encabezados
+    document.querySelectorAll('#asesores-table th.sortable').forEach(th => {
+        const icon = th.querySelector('.sort-icon');
+        if (!icon) return;
+        if (th.getAttribute('data-col') === asesorSortCol) {
+            icon.innerHTML = asesorSortDir === -1 ? '&#8595;' : '&#8593;';
+            th.style.opacity = '1';
+        } else {
+            icon.innerHTML = '&#8597;';
+            th.style.opacity = '0.6';
+        }
+    });
+
+    tbody.innerHTML = '';
+
+    if (lista.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-state">No se encontró ningún asesor con ese nombre.</td></tr>`;
+        footer.innerHTML = '';
+        return;
+    }
+
+    // Totales generales
+    let totAcep = 0, totRech = 0, totCuot = 0, totDev = 0, totPend = 0, totTotal = 0;
+
+    lista.forEach(a => {
+        const efectividad = a.total > 0 ? Math.round((a.aceptadas / a.total) * 100) : 0;
+        let barColor = '#10b981';
+        if (efectividad < 30) barColor = '#f43f5e';
+        else if (efectividad < 60) barColor = '#f59e0b';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="font-weight: 700; font-size: 0.9rem; color: var(--text-main);">${a.nombre}</td>
+            <td style="text-align:center; font-weight: 700; font-size: 1rem;">${a.total}</td>
+            <td style="text-align:center;">
+                <span style="background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3); padding:3px 10px; border-radius:20px; font-weight:700; font-size:0.85rem;">${a.aceptadas}</span>
+            </td>
+            <td style="text-align:center;">
+                <span style="background:rgba(244,63,94,0.15); color:#f43f5e; border:1px solid rgba(244,63,94,0.3); padding:3px 10px; border-radius:20px; font-weight:700; font-size:0.85rem;">${a.rechazadas}</span>
+            </td>
+            <td style="text-align:center;">
+                <span style="background:rgba(59,130,246,0.15); color:#3b82f6; border:1px solid rgba(59,130,246,0.3); padding:3px 10px; border-radius:20px; font-weight:700; font-size:0.85rem;">${a.cuotas}</span>
+            </td>
+            <td style="text-align:center;">
+                <span style="background:rgba(245,158,11,0.15); color:#f59e0b; border:1px solid rgba(245,158,11,0.3); padding:3px 10px; border-radius:20px; font-weight:700; font-size:0.85rem;">${a.devueltas}</span>
+            </td>
+            <td style="text-align:center;">
+                <span style="background:rgba(139,92,246,0.15); color:#8b5cf6; border:1px solid rgba(139,92,246,0.3); padding:3px 10px; border-radius:20px; font-weight:700; font-size:0.85rem;">${a.pendientes}</span>
+            </td>
+            <td style="min-width:130px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <div style="flex:1; background:rgba(255,255,255,0.08); border-radius:20px; height:8px; overflow:hidden;">
+                        <div style="width:${efectividad}%; background:${barColor}; height:100%; border-radius:20px; transition:width 0.5s ease;"></div>
+                    </div>
+                    <span style="font-weight:700; font-size:0.8rem; color:${barColor}; min-width:34px;">${efectividad}%</span>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(tr);
+
+        totAcep += a.aceptadas;
+        totRech += a.rechazadas;
+        totCuot += a.cuotas;
+        totDev  += a.devueltas;
+        totPend += a.pendientes;
+        totTotal += a.total;
+    });
+
+    // Footer con totales
+    const efecGeneral = totTotal > 0 ? Math.round((totAcep / totTotal) * 100) : 0;
+    footer.innerHTML = `
+        <span style="color:var(--text-muted); margin-right:auto;">${lista.length} asesor${lista.length !== 1 ? 'es' : ''} encontrado${lista.length !== 1 ? 's' : ''}</span>
+        <span style="font-weight:600;">Total: <strong>${totTotal}</strong></span>
+        <span style="color:#10b981; font-weight:600;">✓ ${totAcep} Acep.</span>
+        <span style="color:#f43f5e; font-weight:600;">✗ ${totRech} Rech.</span>
+        <span style="color:#3b82f6; font-weight:600;">⊙ ${totCuot} Cuot.</span>
+        <span style="color:#f59e0b; font-weight:600;">↩ ${totDev} Dev.</span>
+        <span style="color:#8b5cf6; font-weight:600;">◷ ${totPend} Pend.</span>
+        <span style="background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.4); padding:4px 14px; border-radius:20px; font-weight:700;">Efectividad global: ${efecGeneral}%</span>
+    `;
 }

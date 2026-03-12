@@ -90,6 +90,12 @@
           style="display: flex; align-items: center; justify-content: center; background: transparent; border: 1px solid var(--border-color); color: var(--text-main); padding: 8px;">
           <span class="material-symbols-outlined" id="theme-icon">light_mode</span>
         </button>
+        <!-- Botón Estadísticas por Asesor -->
+        <button id="btn-asesores" class="action-btn" title="Ver estadísticas por asesor"
+          style="display: flex; align-items: center; gap: 5px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.5);">
+          <span class="material-symbols-outlined" style="font-size: 20px;">leaderboard</span>
+          Estadísticas por Asesor
+        </button>
         <!-- Botón Teresa -->
         <button id="btn-teresa" class="action-btn" title="Ver de Todas las Campañas"
           style="display: flex; align-items: center; gap: 5px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.5);">
@@ -118,8 +124,12 @@
 
     <!-- Tarjetas de Métricas -->
     <div class="metrics-grid">
+      <div class="metric-card desreguladas">
+        <span class="metric-title">Desreguladas</span>
+        <span class="metric-value" id="tot-desreguladas">0</span>
+      </div>
       <div class="metric-card aceptadas">
-        <span class="metric-title">Aceptadas</span>
+        <span class="metric-title">Aceptadas Limpias</span>
         <span class="metric-value" id="tot-aceptadas">0</span>
       </div>
       <div class="metric-card rechazadas">
@@ -167,6 +177,7 @@
         <!-- Botones de Filtro por Estado -->
         <div class="status-filters" id="status-filters" style="display: flex; gap: 8px; flex-wrap: wrap;">
           <button class="filter-btn active" data-filter="TODOS">TODOS</button>
+          <button class="filter-btn filter-btn-desregulada" data-filter="DESREGULADA">DESREGULADAS</button>
           <button class="filter-btn" data-filter="ACEPTADA">ACEPTADAS</button>
           <button class="filter-btn" data-filter="RECHAZADA">RECHAZADAS</button>
           <button class="filter-btn" data-filter="CUOTA">CUOTA</button>
@@ -224,6 +235,84 @@
       <p style="margin: 0; font-size: 0.8rem; opacity: 0.7;">&copy; 2026 GRAVITY CRM. Todos los derechos reservados.</p>
     </div>
   </footer>
+
+  <!-- Modal Estadísticas por Asesor -->
+  <div id="asesores-modal"
+    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.75); backdrop-filter: blur(5px); z-index: 200; justify-content: center; align-items: center;">
+    <div
+      style="background: var(--panel-bg); color: var(--text-main); width: 95%; max-width: 1100px; border-radius: 14px; border: 1px solid var(--border-color); display: flex; flex-direction: column; max-height: 88vh; padding: 2rem; gap: 1.2rem;">
+
+      <!-- Header -->
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span class="material-symbols-outlined" style="color: #38bdf8; font-size: 32px;">leaderboard</span>
+          <div>
+            <h2 style="font-size: 1.4rem; font-weight: 700; margin: 0;">Estadísticas por Asesor</h2>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin: 2px 0 0 0;" id="asesores-subtitulo">Seleccioná una sede para ver sus asesores</p>
+          </div>
+        </div>
+        <button id="close-asesores"
+          style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; display: flex; padding: 4px;">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <!-- Selector de Sede -->
+      <div style="display: flex; gap: 10px; flex-wrap: wrap; padding: 12px 14px; background: rgba(0,0,0,0.2); border-radius: 10px; border: 1px solid var(--border-color); align-items: center;">
+        <span style="color: var(--text-muted); font-size: 0.8rem; font-weight: 700; display: flex; align-items: center; gap: 5px; margin-right: 4px; text-transform: uppercase; letter-spacing: 1px;">
+          <span class="material-symbols-outlined" style="font-size:16px;">location_on</span> Sede:
+        </span>
+        <button class="asesor-sede-btn" id="sede-btn-sanjuan" data-sede="San Juan">
+          📍 San Juan
+        </button>
+        <button class="asesor-sede-btn" id="sede-btn-salta" data-sede="Salta">
+          📍 Salta
+        </button>
+        <button class="asesor-sede-btn" id="sede-btn-emerald" data-sede="Protección Emerald">
+          📍 Protección Emerald
+        </button>
+        <div id="asesores-loading-hint" style="display:none; align-items:center; gap:6px; color:#f59e0b; font-size:0.8rem; margin-left:auto;">
+          <div class="spinner" style="width:14px;height:14px;border-width:2px;margin-bottom:0;"></div>
+          Cargando datos globales...
+        </div>
+      </div>
+
+      <!-- Buscador de asesor -->
+      <div style="position: relative;">
+        <span class="material-symbols-outlined"
+          style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 20px; pointer-events:none;">person_search</span>
+        <input type="text" id="buscador-asesor"
+          placeholder="Buscar asesor por nombre..."
+          style="width: 100%; padding: 10px 16px 10px 42px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main); font-size: 0.9rem; outline: none; font-family: inherit;" />
+      </div>
+
+      <!-- Tabla de asesores -->
+      <div style="overflow-y: auto; flex: 1;">
+        <table style="width: 100%; border-collapse: collapse;" id="asesores-table">
+          <thead>
+            <tr>
+              <th class="asesor-th sortable" data-col="nombre" style="text-align:left; cursor:pointer; user-select:none;">Asesor <span class="sort-icon">&#8597;</span></th>
+              <th class="asesor-th sortable" data-col="total" style="cursor:pointer; user-select:none;">Total <span class="sort-icon">&#8597;</span></th>
+              <th class="asesor-th sortable" data-col="aceptadas" style="color:#10b981; cursor:pointer; user-select:none;">Aceptadas <span class="sort-icon">&#8597;</span></th>
+              <th class="asesor-th sortable" data-col="rechazadas" style="color:#f43f5e; cursor:pointer; user-select:none;">Rechazadas <span class="sort-icon">&#8597;</span></th>
+              <th class="asesor-th sortable" data-col="cuotas" style="color:#3b82f6; cursor:pointer; user-select:none;">Cuotas <span class="sort-icon">&#8597;</span></th>
+              <th class="asesor-th sortable" data-col="devueltas" style="color:#f59e0b; cursor:pointer; user-select:none;">Devueltas <span class="sort-icon">&#8597;</span></th>
+              <th class="asesor-th sortable" data-col="pendientes" style="color:#8b5cf6; cursor:pointer; user-select:none;">Pendientes <span class="sort-icon">&#8597;</span></th>
+              <th class="asesor-th" style="color:#10b981;">% Efectividad</th>
+            </tr>
+          </thead>
+          <tbody id="asesores-body">
+            <!-- Filas generadas por JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Totalizador -->
+      <div id="asesores-footer"
+        style="padding-top: 14px; border-top: 1px solid var(--border-color); display: flex; gap: 20px; flex-wrap: wrap; justify-content: flex-end; align-items: center; font-size: 0.9rem;">
+      </div>
+    </div>
+  </div>
 
   <!-- Modal Teresa -->
   <div id="teresa-modal"
