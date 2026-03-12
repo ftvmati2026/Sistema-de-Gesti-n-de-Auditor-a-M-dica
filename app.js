@@ -1267,7 +1267,12 @@ function renderTablaAsesores(data, filtro, mesFiltro) {
     let totAcep = 0, totRech = 0, totCuot = 0, totDev = 0, totPend = 0, totTotal = 0;
 
     lista.forEach(a => {
-        const efectividad = a.total > 0 ? Math.round((a.aceptadas / a.total) * 100) : 0;
+        // Fórmula: (Aceptadas + Cuotas) / (Aceptadas + Cuotas + Rechazadas + Devueltas) × 100
+        // Las Pendientes se excluyen porque aún no tienen resultado definitivo
+        const denominadorAsesor = a.aceptadas + a.cuotas + a.rechazadas + a.devueltas;
+        const efectividad = denominadorAsesor > 0
+            ? Math.round(((a.aceptadas + a.cuotas) / denominadorAsesor) * 100)
+            : 0;
         let barColor = '#10b981';
         if (efectividad < 30) barColor = '#f43f5e';
         else if (efectividad < 60) barColor = '#f59e0b';
@@ -1311,7 +1316,9 @@ function renderTablaAsesores(data, filtro, mesFiltro) {
     });
 
     // Footer con totales
-    const efecGeneral = totTotal > 0 ? Math.round((totAcep / totTotal) * 100) : 0;
+    // Efectividad global con la misma fórmula: (Acep+Cuot) / (Acep+Cuot+Rech+Dev)
+    const denominadorGlobal = totAcep + totCuot + totRech + totDev;
+    const efecGeneral = denominadorGlobal > 0 ? Math.round(((totAcep + totCuot) / denominadorGlobal) * 100) : 0;
     footer.innerHTML = `
         <span style="color:var(--text-muted); margin-right:auto;">${lista.length} asesor${lista.length !== 1 ? 'es' : ''} encontrado${lista.length !== 1 ? 's' : ''}</span>
         <span style="font-weight:600;">Total: <strong>${totTotal}</strong></span>
